@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+body {
+  background:
+    radial-gradient(circle at 20% 0%, #d6d3c9 0%, transparent 50%),
+    radial-gradient(circle at 90% 100%, #c9c5b9 0%, transparent 50%),
+    var(--ink);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+:root {
+  --ink: #f0efe8;
+  --ink-2: #e0ddd5;
+  --ink-3: #c9c5b9;
+  --line: #b0a996;
+  --line-2: #99907c;
+  --paper: #0b1320;
+  --paper-2: #242424;
+  --text: #1a2640;
+  --muted: #4e596e;
+  --muted-2: #6f7c93;
+  --accent: #b08a30;
+  --accent-2: #c4a14d;
+  --hot: #bd443a;
+  --cool: #3a8a90;
+  --green: #749961;
+  --serif: 'Newsreader', Georgia, serif;
+  --mono: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  --label: 'IBM Plex Mono', monospace;
+}
+
+.dark {
+  --ink: #0b1320;
+  --ink-2: #111c2e;
+  --ink-3: #1a2640;
+  --line: #243556;
+  --line-2: #34466b;
+  --paper: #e8e3d6;
+  --paper-2: #d6cfbd;
+  --text: #d8dde6;
+  --muted: #7d8aa3;
+  --muted-2: #5a6781;
+  --accent: #e9b949;
+  --accent-2: #f0d28a;
+  --hot: #e85a4f;
+  --cool: #6ec3c9;
+  --green: #a3c98f;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at 20% 0%, #142036 0%, transparent 50%),
+    radial-gradient(circle at 90% 100%, #0f1a2e 0%, transparent 50%),
+    var(--ink);
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.stage { animation: fadeUp 0.5s ease backwards; }

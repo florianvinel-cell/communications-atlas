@@ -13,7 +13,7 @@ import FlowVisualizer from './components/FlowVisualizer';
 import CustomerLookup from './components/CustomerLookup';
 
 export default function App() {
-  const { config, graphConfig, presets, savePreset, applyPreset, toggleVisibility, setStage, setMetadata, setMultipleMetadata, setActivePlan, setNodePosition, addCampaign, updateCampaign, addCustomEdge, removeCustomEdge, commitChanges, loading } = useAppConfig();
+  const { config, graphConfig, presets, savePreset, applyPreset, toggleVisibility, setStage, setMetadata, setMultipleMetadata, setActivePlan, setNodePosition, addCampaign, updateCampaign, addCustomEdge, removeCustomEdge, reorderCampaign, commitChanges, loading } = useAppConfig();
   const [search, setSearch] = useState('');
   const [activeStage, setActiveStage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'view' | 'admin'>('view');
@@ -126,6 +126,8 @@ export default function App() {
     });
 
     // Logic to determine which campaigns/stages to show
+    const orderConfig = config.campaignOrder || [];
+
     return DATA.stages.map(sc => {
       const items = (groups[sc] || []).filter(code => {
         const name = (config.campaignMetadata[code]?.customName || DATA.nodes[code] || "").toLowerCase();
@@ -134,33 +136,42 @@ export default function App() {
         return matchesQ && matchesStage;
       });
 
-      if (sc === 'ACQUISITION') {
-          items.sort((a, b) => {
+      items.sort((a, b) => {
+          const idxA = orderConfig.indexOf(a);
+          const idxB = orderConfig.indexOf(b);
+          
+          // If either has a custom order set, use that
+          if (idxA !== -1 || idxB !== -1) {
+              if (idxA === -1) return 1;
+              if (idxB === -1) return -1;
+              return idxA - idxB;
+          }
+
+          // Fallback default sorting behaviors
+          if (sc === 'ACQUISITION') {
               const volA = parseInt(String(config.campaignMetadata[a]?.metrics?.volume || '0').replace(/[^\d]/g, ''), 10) || 0;
               const volB = parseInt(String(config.campaignMetadata[b]?.metrics?.volume || '0').replace(/[^\d]/g, ''), 10) || 0;
               return volB - volA;
-          });
-      } else if (sc === 'PREBUILD') {
-          const order = ['PAY', 'LAUNCHPATH', 'PCL580', 'PLUSPATH', 'PCP888', 'SF', 'TFC401', 'DLC402', 'DLC2991', 'SFC879', 'TFD403', 'BUILD', 'WBL287', 'NPS906'];
-          items.sort((a, b) => {
-              const orderA = order.indexOf(a);
-              const orderB = order.indexOf(b);
+          } else if (sc === 'PREBUILD') {
+              const defaultOrder = ['PAY', 'LAUNCHPATH', 'PCL580', 'PLUSPATH', 'PCP888', 'SF', 'TFC401', 'DLC402', 'DLC2991', 'SFC879', 'TFD403', 'BUILD', 'WBL287', 'NPS906'];
+              const orderA = defaultOrder.indexOf(a);
+              const orderB = defaultOrder.indexOf(b);
               if (orderA === -1 && orderB === -1) return 0;
               if (orderA === -1) return 1;
               if (orderB === -1) return -1;
               return orderA - orderB;
-          });
-      } else if (sc === 'UPGRADES') {
-          const order = ['UPGRADE918', 'MTA250'];
-          items.sort((a, b) => {
-              const orderA = order.indexOf(a);
-              const orderB = order.indexOf(b);
+          } else if (sc === 'UPGRADES') {
+              const defaultOrder = ['UPGRADE918', 'MTA250'];
+              const orderA = defaultOrder.indexOf(a);
+              const orderB = defaultOrder.indexOf(b);
               if (orderA === -1 && orderB === -1) return 0;
               if (orderA === -1) return 1;
               if (orderB === -1) return -1;
               return orderA - orderB;
-          });
-      }
+          }
+          return 0;
+      });
+
       return { sc, items };
     }).filter(s => s.items.length > 0);
   }, [search, activeStage, config]);
@@ -290,13 +301,6 @@ export default function App() {
               <span><strong className="text-[var(--accent)] text-[12px] font-medium mr-2">{totalVisible}</strong>visible</span>
               <span><strong className="text-[var(--accent)] text-[12px] font-medium mr-2">{DATA.edges.length}</strong>connections</span>
             </div>
-            <button
-               onClick={() => handleRefreshVisibleStats(filteredData.flatMap(s => s.items))}
-               disabled={refreshingStats}
-               className="flex items-center gap-1 font-mono text-[10px] tracking-widest uppercase bg-[var(--ink)] border border-[var(--line)] px-3 py-1.5 hover:bg-[var(--ink-3)] text-[var(--paper)] transition-colors disabled:opacity-50"
-             >
-               {refreshingStats ? 'Fetching stats...' : 'Fetch Live Stats'}
-            </button>
           </div>
         )}
       </div>
@@ -308,7 +312,7 @@ export default function App() {
                 <button onClick={() => { if(adminPassword === 'UENI2026') setIsAdmin(true); }} className="px-4 py-2 bg-[var(--accent)] text-[var(--ink)] font-mono uppercase">Login</button>
             </div>
         ) : (
-            <AdminView config={config} presets={presets} savePreset={savePreset} applyPreset={applyPreset} toggleVisibility={toggleVisibility} setStage={setStage} setMetadata={setMetadata} setActivePlan={setActivePlan} setNodePosition={setNodePosition} addCampaign={addCampaign} updateCampaign={updateCampaign} addCustomEdge={addCustomEdge} removeCustomEdge={removeCustomEdge} />
+            <AdminView config={config} presets={presets} savePreset={savePreset} applyPreset={applyPreset} toggleVisibility={toggleVisibility} setStage={setStage} setMetadata={setMetadata} setMultipleMetadata={setMultipleMetadata} commitChanges={commitChanges} setActivePlan={setActivePlan} setNodePosition={setNodePosition} addCampaign={addCampaign} updateCampaign={updateCampaign} addCustomEdge={addCustomEdge} removeCustomEdge={removeCustomEdge} reorderCampaign={reorderCampaign} />
         )
       ) : viewMode === 'graph' ? (
         <CampaignGraph config={config} onNodeClick={openPanel} />

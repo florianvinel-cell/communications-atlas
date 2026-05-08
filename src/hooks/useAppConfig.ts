@@ -15,6 +15,7 @@ export type CampaignMetadata = {
   plan?: 'Launch' | 'Plus' | 'Leads' | 'Launch & Plus';
   flow?: any;
   cioId?: string;
+  campaignId?: number;
 };
 
 export type AppConfig = {
@@ -25,6 +26,7 @@ export type AppConfig = {
   activePlan: 'Leads' | 'Launch' | 'Plus';
   customNodes: Record<string, { label: string, type: 'campaign' | 'source' | 'milestone' }>;
   customEdges?: Array<{ id: string, source: string, target: string }>;
+  campaignOrder?: string[];
 };
 
 export type SavedPreset = {
@@ -270,5 +272,91 @@ export function useAppConfig() {
     });
   };
 
-  return { config, graphConfig, presets, savePreset, applyPreset, toggleVisibility, setStage, setMetadata, setMultipleMetadata, setActivePlan, setNodePosition, addCampaign, updateCampaign, addCustomEdge, removeCustomEdge, commitChanges, loading };
+  const reorderCampaign = (stage: string, code: string, direction: 'up' | 'down') => {
+    setConfig(prev => {
+      // Get current items in the stage ordered correctly
+      const allCodes = Object.keys(DATA.nodes).filter(c => !DATA.stages.includes(c));
+      const order = prev.campaignOrder || [];
+      
+      // Items in this stage
+      let currentStageCodes = allCodes.filter(c => (prev.campaignStages[c] || DATA.stages[0]) === stage);
+      
+      // Sort them by current order
+      currentStageCodes.sort((a, b) => {
+          const idxA = order.indexOf(a);
+          const idxB = order.indexOf(b);
+          if (idxA !== -1 || idxB !== -1) {
+              if (idxA === -1) return 1;
+              if (idxB === -1) return -1;
+              return idxA - idxB;
+          }
+          
+          // Fallback logic as in App.tsx
+          if (stage === 'ACQUISITION') {
+              const volA = parseInt(String(prev.campaignMetadata[a]?.metrics?.volume || '0').replace(/[^\d]/g, ''), 10) || 0;
+              const volB = parseInt(String(prev.campaignMetadata[b]?.metrics?.volume || '0').replace(/[^\d]/g, ''), 10) || 0;
+              return volB - volA;
+          } else if (stage === 'PREBUILD') {
+              const defaultOrder = ['PAY', 'LAUNCHPATH', 'PCL580', 'PLUSPATH', 'PCP888', 'SF', 'TFC401', 'DLC402', 'DLC2991', 'SFC879', 'TFD403', 'BUILD', 'WBL287', 'NPS906'];
+              const orderA = defaultOrder.indexOf(a);
+              const orderB = defaultOrder.indexOf(b);
+              if (orderA === -1 && orderB === -1) return 0;
+              if (orderA === -1) return 1;
+              if (orderB === -1) return -1;
+              return orderA - orderB;
+          } else if (stage === 'UPGRADES') {
+              const defaultOrder = ['UPGRADE918', 'MTA250'];
+              const orderA = defaultOrder.indexOf(a);
+              const orderB = defaultOrder.indexOf(b);
+              if (orderA === -1 && orderB === -1) return 0;
+              if (orderA === -1) return 1;
+              if (orderB === -1) return -1;
+              return orderA - orderB;
+          }
+          return 0;
+      });
+
+      const currentIndex = currentStageCodes.indexOf(code);
+      if (currentIndex === -1) return prev;
+      if (direction === 'up' && currentIndex === 0) return prev;
+      if (direction === 'down' && currentIndex === currentStageCodes.length - 1) return prev;
+
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      
+      const newStageCodes = [...currentStageCodes];
+      const temp = newStageCodes[currentIndex];
+      newStageCodes[currentIndex] = newStageCodes[targetIndex];
+      newStageCodes[targetIndex] = temp;
+
+      // Create new global order
+      // We take existing order, remove items that are in current stage
+      // and append the new customized order for this stage at the end or replace it in place
+      
+      // Easiest is to just rebuild a new global order array 
+      // keeping things we aren't touching intact, but ordering the current stage properly
+      const newGlobalOrder = allCodes.sort((a, b) => {
+          const stageA = prev.campaignStages[a] || DATA.stages[0];
+          const stageB = prev.campaignStages[b] || DATA.stages[0];
+          
+          if (stageA === stage && stageB === stage) {
+              return newStageCodes.indexOf(a) - newStageCodes.indexOf(b);
+          }
+          if (stageA === stage) return order.includes(a) ? order.indexOf(a) : 9999;
+          if (stageB === stage) return order.includes(b) ? order.indexOf(b) : 9999;
+          
+          const idxA = order.indexOf(a);
+          const idxB = order.indexOf(b);
+          if (idxA === -1 && idxB === -1) return 0;
+          if (idxA === -1) return 1;
+          if (idxB === -1) return -1;
+          return idxA - idxB;
+      });
+
+      const next = { ...prev, campaignOrder: newGlobalOrder };
+      saveToSupabase(next);
+      return next;
+    });
+  };
+
+  return { config, graphConfig, presets, savePreset, applyPreset, toggleVisibility, setStage, setMetadata, setMultipleMetadata, setActivePlan, setNodePosition, addCampaign, updateCampaign, addCustomEdge, removeCustomEdge, reorderCampaign, commitChanges, loading };
 }

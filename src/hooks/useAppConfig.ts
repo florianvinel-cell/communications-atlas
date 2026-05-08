@@ -159,6 +159,20 @@ export function useAppConfig() {
     });
   };
 
+  const setMultipleMetadata = (updates: Record<string, CampaignMetadata>) => {
+    setConfig(prev => {
+        const next = {
+          ...prev,
+          campaignMetadata: {
+            ...prev.campaignMetadata,
+            ...updates,
+          },
+        };
+        saveToSupabase(next);
+        return next;
+    });
+  };
+
   const setMetadata = (code: string, metadata: CampaignMetadata) => {
     setConfig(prev => {
         const next = {
@@ -256,5 +270,5 @@ export function useAppConfig() {
     });
   };
 
-  return { config, graphConfig, presets, savePreset, applyPreset, toggleVisibility, setStage, setMetadata, setActivePlan, setNodePosition, addCampaign, updateCampaign, addCustomEdge, removeCustomEdge, commitChanges, loading };
+  return { config, graphConfig, presets, savePreset, applyPreset, toggleVisibility, setStage, setMetadata, setMultipleMetadata, setActivePlan, setNodePosition, addCampaign, updateCampaign, addCustomEdge, removeCustomEdge, commitChanges, loading };
 }

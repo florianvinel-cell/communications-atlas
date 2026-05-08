@@ -38,6 +38,36 @@ async function startServer() {
     }
   });
 
+  // API route to get metrics for a campaign
+  app.get("/api/campaigns/:campaignId/metrics", async (req, res) => {
+    const { campaignId } = req.params;
+    const { period, steps } = req.query;
+    const key = process.env.CUSTOMER_IO_APP_KEY || process.env.CUSTOMER_IO_APP_API_KEY;
+
+    if (!key) {
+      return res.status(500).json({ error: "CUSTOMER_IO_APP_KEY not configured" });
+    }
+
+    try {
+      const qPeriod = period || 'days';
+      const qSteps = steps || 30;
+      const response = await fetch(
+        `https://api.customer.io/v1/campaigns/${campaignId}/metrics?period=${qPeriod}&steps=${qSteps}`,
+        { headers: { Authorization: `Bearer ${key}` } }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch metrics: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to fetch campaign metrics" });
+    }
+  });
+
   // API route to get all actions for a campaign
   app.get("/api/campaigns/:campaignId/actions", async (req, res) => {
     const { campaignId } = req.params;

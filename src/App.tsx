@@ -13,7 +13,7 @@ import FlowVisualizer from './components/FlowVisualizer';
 import CustomerLookup from './components/CustomerLookup';
 
 export default function App() {
-  const { config, graphConfig, presets, savePreset, applyPreset, toggleVisibility, setStage, setMetadata, setActivePlan, setNodePosition, addCampaign, updateCampaign, addCustomEdge, removeCustomEdge, commitChanges, loading } = useAppConfig();
+  const { config, graphConfig, presets, savePreset, applyPreset, toggleVisibility, setStage, setMetadata, setMultipleMetadata, setActivePlan, setNodePosition, addCampaign, updateCampaign, addCustomEdge, removeCustomEdge, commitChanges, loading } = useAppConfig();
   const [search, setSearch] = useState('');
   const [activeStage, setActiveStage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'view' | 'admin'>('view');
@@ -23,6 +23,56 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'graph' | 'lookup'>('list');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [refreshingStats, setRefreshingStats] = useState(false);
+
+  const handleRefreshVisibleStats = async (visibleCodes: string[]) => {
+    setRefreshingStats(true);
+    const updates: Record<string, any> = {};
+
+    try {
+      for (const code of visibleCodes) {
+        const meta = config.campaignMetadata[code];
+        if (meta?.campaignId) {
+          const res = await fetch(`/api/campaigns/${meta.campaignId}/metrics?period=days&steps=30`);
+          if (res.ok) {
+            const data = await res.json();
+            const series = data.metric?.series || {};
+            const sumArray = (arr: number[]) => (arr || []).reduce((a, b) => a + b, 0);
+            
+            const sent = sumArray(series.sent);
+            const opens = sumArray(series.opened);
+            const clicks = sumArray(series.clicked);
+            
+            let openRate = '0.0%';
+            let clickRate = '0.0%';
+            if (sent > 0) {
+              openRate = ((opens / sent) * 100).toFixed(1) + '%';
+              clickRate = ((clicks / opens) * 100).toFixed(1) + '%';
+            }
+            
+            updates[code] = {
+              ...meta,
+              metrics: {
+                ...meta.metrics,
+                volume: sent.toLocaleString('en-US'),
+                openRate,
+                clickRate
+              }
+            };
+          }
+        }
+      }
+      
+      if (Object.keys(updates).length > 0) {
+        setMultipleMetadata(updates);
+      }
+    } catch (e) {
+      console.error("Failed to refresh stats", e);
+    } finally {
+      if (commitChanges) commitChanges();
+      setRefreshingStats(false);
+    }
+  };
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set(DATA.stages));
 
   const maxVolumeCode = useMemo(() => {
@@ -235,9 +285,18 @@ export default function App() {
         )}
 
         {viewMode !== 'lookup' && activeTab === 'view' && (
-          <div className="flex gap-6 font-mono text-[11px] tracking-[0.1em] uppercase text-[var(--muted)] pt-3 mt-1 border-t border-[var(--line)]">
-            <span><strong className="text-[var(--accent)] text-[12px] font-medium mr-2">{totalVisible}</strong>visible</span>
-            <span><strong className="text-[var(--accent)] text-[12px] font-medium mr-2">{DATA.edges.length}</strong>connections</span>
+          <div className="flex justify-between items-center pt-3 mt-1 border-t border-[var(--line)]">
+            <div className="flex gap-6 font-mono text-[11px] tracking-[0.1em] uppercase text-[var(--muted)]">
+              <span><strong className="text-[var(--accent)] text-[12px] font-medium mr-2">{totalVisible}</strong>visible</span>
+              <span><strong className="text-[var(--accent)] text-[12px] font-medium mr-2">{DATA.edges.length}</strong>connections</span>
+            </div>
+            <button
+               onClick={() => handleRefreshVisibleStats(filteredData.flatMap(s => s.items))}
+               disabled={refreshingStats}
+               className="flex items-center gap-1 font-mono text-[10px] tracking-widest uppercase bg-[var(--ink)] border border-[var(--line)] px-3 py-1.5 hover:bg-[var(--ink-3)] text-[var(--paper)] transition-colors disabled:opacity-50"
+             >
+               {refreshingStats ? 'Fetching stats...' : 'Fetch Live Stats'}
+            </button>
           </div>
         )}
       </div>
